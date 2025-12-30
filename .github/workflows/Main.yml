@@ -19,9 +19,13 @@ jobs:
 
       - name: Create user
         run: |
-          sudo useradd -m rdp
-          echo "rdp:$(openssl rand -base64 12)" | sudo chpasswd
-          sudo usermod -aG sudo rdp
+           PASSWORD=$(openssl rand -base64 12)
+            sudo useradd -m rdp
+             echo "rdp:$PASSWORD" | sudo chpasswd
+              sudo usermod -aG sudo rdp
+                echo "RDP_USERNAME=rdp" >> $GITHUB_ENV
+                  echo "RDP_PASSWORD=$PASSWORD" >> $GITHUB_ENV
+                    echo "Login password: $PASSWORD"
 
       - name: Install Tailscale
         run: |
