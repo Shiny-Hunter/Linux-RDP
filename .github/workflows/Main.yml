@@ -1,41 +1,59 @@
-name: Linux RDP
+name: Linux SSH
 
 on:
   workflow_dispatch:
 
 jobs:
-  linux-rdp:
+  ssh-access:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
-      - name: Install desktop + RDP
+      - name: Install OpenSSH server
         run: |
           sudo apt update
-          sudo apt install -y xfce4 xfce4-goodies xrdp
-          sudo systemctl enable xrdp
-          sudo systemctl start xrdp
-          echo xfce4-session > ~/.xsession
+          sudo apt install -y openssh-server
+          sudo systemctl enable ssh
+          sudo systemctl start ssh
 
-      - name: Create user
+      - name: Create SSH user
         run: |
-           PASSWORD=$(openssl rand -base64 12)
-            sudo useradd -m rdp
-             echo "rdp:$PASSWORD" | sudo chpasswd
-              sudo usermod -aG sudo rdp
-                echo "RDP_USERNAME=rdp" >> $GITHUB_ENV
-                  echo "RDP_PASSWORD=$PASSWORD" >> $GITHUB_ENV
-                    echo "Login password: $PASSWORD"
+          sudo useradd -m sshuser
+          PASSWORD=$(openssl rand -base64 16)
+          echo "sshuser:$PASSWORD" | sudo chpasswd
+          sudo usermod -aG sudo sshuser
+          echo "SSH_USER=sshuser" >> $GITHUB_ENV
+          echo "SSH_PASSWORD=$PASSWORD" >> $GITHUB_ENV
+          echo "SSH login password: $PASSWORD"
+
+      - name: Harden SSH (recommended)
+        run: |
+          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+          sudo systemctl restart ssh
 
       - name: Install Tailscale
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
 
-      - name: Connect Tailscale
+      - name: Connect to Tailscale
         run: |
-          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }}
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-linux-${{ github.run_id }}
           tailscale ip -4
+
+      - name: Show SSH access info
+        run: |
+          echo "=============================="
+          echo " SSH ACCESS"
+          echo " Host: $(tailscale ip -4)"
+          echo " User: $SSH_USER"
+          echo " Password: $SSH_PASSWORD"
+          echo " Port: 22"
+          echo "=============================="
 
       - name: Keep alive
         run: |
-          while true; do sleep 300; done
+          while true; do
+            echo "[$(date)] SSH active"
+            sleep 300
+          done
